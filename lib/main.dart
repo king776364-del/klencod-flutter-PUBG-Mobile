@@ -1,221 +1,257 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'dart:math';
 
 void main() {
-  runApp(const PUBGGameApp());
+  runApp(const ActionGameApp());
 }
 
-class PUBGGameApp extends StatelessWidget {
-  const PUBGGameApp({Key? key}) : super(key: key);
+class ActionGameApp extends StatelessWidget {
+  const ActionGameApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Battlegrounds Mobile Offline',
+      title: 'Battlegrounds 2D Action',
       theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF121212),
-        primaryColor: Colors.amber,
+        scaffoldBackgroundColor: const Color(0xFF0F172A),
       ),
-      home: const GameHomeScreen(),
+      home: const GamePlayScreen(),
     );
   }
 }
 
-class GameHomeScreen extends StatefulWidget {
-  const GameHomeScreen({Key? key}) : super(key: key);
+class GamePlayScreen extends StatefulWidget {
+  const GamePlayScreen({Key? key}) : super(key: key);
 
   @override
-  State<GameHomeScreen> createState() => _GameHomeScreenState();
+  State<GamePlayScreen> createState() => _GamePlayScreenState();
 }
 
-class _GameHomeScreenState extends State<GameHomeScreen> {
+class _GamePlayScreenState extends State<GamePlayScreen> {
+  // إحصائيات اللاعب والمعركة
   int playerHealth = 100;
-  int playerHelmet = 0;
-  int playerArmor = 0;
-  String currentWeapon = "فارغ (بدون سلاح)";
-  int ammoCount = 0;
-  int alivePlayers = 100;
-  int kills = 0;
-  bool isGrounded = false;
-  String gameLog = "تعليمات:\n1. اضغط على الهبوط بالمظلة للنزول في الخريطة.\n2. اجمع الأسلحة والدروع.\n3. ابدأ الاشتباك وكن الباقي حياً!";
+  int score = 0;
+  double playerX = 150.0; // موقع اللاعب الأفقي
+  String currentWeapon = "سلاح M416";
+  bool isFiring = false;
+  String enemyStatus = "عدو يتقدم نحو المنطقة!";
+  Timer? gameLoopTimer;
 
-  void _landPlane() {
-    setState(() {
-      isGrounded = true;
-      playerHealth = 100;
-      alivePlayers = 99;
-      kills = 0;
-      currentWeapon = "مقاق (Pan)";
-      ammoCount = 0;
-      gameLog = "🪂 هبطت بنجاح في خريطة Erangel (منطقة Pochinki). العدو قريب، ابحث عن العتاد بسرعة!";
-    });
+  @override
+  void initState() {
+    super.initState();
+    startGameLoop();
   }
 
-  void _lootWeapon() {
-    if (!isGrounded) {
-      _showToast("يجب الهبوط من الطائرة أولاً!");
-      return;
-    }
-    List<String> weapons = ["أسطوري AWM (منظار 8x)", "سلاح M416 (كامل الملحقات)", "قناص Kar98k", "رشاش UMP45"];
-    List<int> ammos = [15, 90, 25, 60];
-    int idx = Random().nextInt(weapons.length);
-
-    setState(() {
-      currentWeapon = weapons[idx];
-      ammoCount = ammos[idx];
-      gameLog = "🎒 لوت ناجح! عثرت على: $currentWeapon مع ذخيرة: $ammoCount طلقة.";
-    });
-  }
-
-  void _lootArmor() {
-    if (!isGrounded) {
-      _showToast("هبط أولاً للخريطة!");
-      return;
-    }
-    setState(() {
-      playerHelmet = Random().nextInt(3) + 1;
-      playerArmor = Random().nextInt(3) + 1;
-      gameLog = "🛡️ رائع! تم تجهيز درع مستوى $playerArmor وخوذة مستوى $playerHelmet بنجاح.";
-    });
-  }
-
-  void _fightEnemy() {
-    if (!isGrounded) {
-      _showToast("أنت لم تهبط بعد!");
-      return;
-    }
-    if (playerHealth <= 0) {
+  // حلقة اللعبة لتحديث الحركة والأعداء تلقائياً
+  void startGameLoop() {
+    gameLoopTimer = Timer.periodic(const Duration(milliseconds: 300), (timer) {
+      if (!mounted) return;
       setState(() {
-        gameLog = "💀 أنت ميت! اضغط على 'الهبوط بالمظلة' لبدء جيم جديد.";
+        // حركة عشوائية للأعداء واختبار المواجهة
+        int event = Random().nextInt(4);
+        if (event == 0) {
+          enemyStatus = "⚠️ تحذير: قناص يطلق النار في الاتجاه المعاكس!";
+          playerHealth -= 5;
+        } else if (event == 1) {
+          enemyStatus = "🎯 تم رصد عدو في المدى القريب! أطلق النار بسرعة!";
+        } else {
+          enemyStatus = "🟢 المنطقة آمنة مؤقتاً، استمر بالتقدم.";
+        }
+
+        if (playerHealth <= 0) {
+          playerHealth = 0;
+          enemyStatus = "💀 تمت تصفيتك في المعركة! اضغط إعادة لتشغيل جيم جديد.";
+        }
       });
-      return;
-    }
+    });
+  }
 
-    int event = Random().nextInt(3);
+  @override
+  void dispose() {
+    gameLoopTimer?.cancel();
+    super.dispose();
+  }
+
+  void movePlayer(String direction) {
     setState(() {
-      if (event == 0) {
-        kills += 1;
-        alivePlayers -= Random().nextInt(5) + 1;
-        if (alivePlayers < 1) alivePlayers = 1;
-        gameLog = "🔥 اشتباك ناري مباشر! استخدمت $currentWeapon وقمت بالتصفية بنجاح.";
-      } else if (event == 1) {
-        int damage = (Random().nextInt(40) / (playerArmor == 0 ? 1 : playerArmor)).round();
-        playerHealth -= damage;
-        if (playerHealth < 0) playerHealth = 0;
-        gameLog = "⚠️ تعرضت لإطلاق نار من قناص مخفي! نقصت صحتك بمقدار $damage%.";
+      if (direction == "left") {
+        playerX = max(20.0, playerX - 40.0);
       } else {
-        gameLog = "🟢 أنت داخل المنطقة الآمنة (Safe Zone). استمر في التقدم!";
-      }
-
-      if (playerHealth == 0) {
-        gameLog = "💀 تم تصفيتك في المعركة (Eliminated). حاول مرة أخرى!";
-      } else if (alivePlayers == 1 && isGrounded) {
-        gameLog = "🏆 WINNER WINNER CHICKEN DINNER! 🎉 فزت بالمرتبة الأولى وبقيت وحيداً على قيد الحياة!";
+        playerX = min(320.0, playerX + 40.0);
       }
     });
   }
 
-  void _useMedKit() {
+  void fireWeapon() {
     setState(() {
-      if (playerHealth >= 100) {
-        gameLog = "💚 صحتك ممتلئة بالكامل (100%).";
-      } else {
-        playerHealth = 100;
-        gameLog = "💉 استخدمت الإسعافات الأولية ومشروب الطاقة. عادت صحتك 100%!";
-      }
+      isFiring = true;
+      score += 10; // زيادة النقاط عند إطلاق النار والقضاء على الأعداء
+      enemyStatus = "🔥 طلقات نارية مكثفة من " + currentWeapon + "! تم اصابة العدو بنجاح.";
+    });
+    // إلغاء وميض إطلاق النار بعد جزء من الثانية
+    Timer(const Duration(milliseconds: 150), () {
+      if (mounted) setState(() => isFiring = false);
     });
   }
 
-  void _showToast(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), duration: const Duration(seconds: 1)));
+  void resetGame() {
+    setState(() {
+      playerHealth = 100;
+      score = 0;
+      playerX = 150.0;
+      enemyStatus = "🪂 هبطت مجدداً في الخريطة. ابدأ الحركة والقتال!";
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('PUBG Mobile Offline/Online'),
+        title: const Text('PUBG 2D Battle Action'),
         centerTitle: true,
-        backgroundColor: const Color(0xFF1F1F1F),
+        backgroundColor: const Color(0xFF1E293B),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // شريط الحالة HUD
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E1E1E),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.amber.withOpacity(0.3)),
+      body: Column(
+        children: [
+          // شريط الحالة العلوي
+          Container(
+            padding: const EdgeInsets.all(12),
+            color: const Color(0xFF1E293B),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text("❤️ الصحة: $playerHealth%", style: const TextStyle(color: Colors.greenAccent, fontSize: 14, fontWeight: FontWeight.bold)),
+                Text("🏆 النقاط (القتلى): $score", style: const TextStyle(color: Colors.amber, fontSize: 14, fontWeight: FontWeight.bold)),
+                Text("🔫 $currentWeapon", style: const TextStyle(color: Colors.blueAccent, fontSize: 13)),
+              ],
+            ),
+          ),
+
+          // ساحة المعركة المرئية (الميدان الذي تتحرك فيه الشخصية)
+          Expanded(
+            flex: 3,
+            child: Container(
+              width: double.infinity,
+              decoration: const BoxDecoration(
+                color: Color(0xFF090D16),
+                image: DecorationImage(
+                  image: NetworkImage('https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600'),
+                  fit: BoxFit.cover,
+                  opacity: 0.25,
+                ),
               ),
-              child: Text(
-                "❤️ الصحة: $playerHealth%  |  🛡️ درع/خوذة: Lv.$playerArmor/Lv.$playerHelmet\n"
-                "🔫 السلاح: $currentWeapon ($ammoCount)\n"
-                "👥 الباقون: $alivePlayers  |  🎯 القتلى: $kills",
-                style: const TextStyle(color: Colors.greenAccent, fontSize: 13, height: 1.4),
+              child: Stack(
+                children: [
+                  // رسالة الحالة والأحداث في منتصف الميدان
+                  Positioned(
+                    top: 20,
+                    left: 20,
+                    right: 20,
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        enemyStatus,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white70, fontSize: 13),
+                      ),
+                    ),
+                  ),
+
+                  // تأثير إطلاق النار (رصاصة أو وميض)
+                  if (isFiring)
+                    Positioned(
+                      bottom: 120,
+                      left: playerX + 15,
+                      child: Container(
+                        width: 10,
+                        height: 40,
+                        color: Colors.amberAccent,
+                      ),
+                    ),
+
+                  // شخصية البطل المقاتل التي تتحرك في الميدان
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 150),
+                    bottom: 40,
+                    left: playerX,
+                    child: Column(
+                      children: [
+                        const Text("🔫", style: TextStyle(fontSize: 24)),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.redAccent,
+                            borderRadius: BorderRadius.circular(15),
+                            boxShadow: [
+                              BoxShadow(color: Colors.red.withOpacity(0.5), blurRadius: 8, spreadRadius: 2)
+                            ],
+                          ),
+                          child: const Text(
+                            "👤 بطل المعركة",
+                            style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // أعداء متحرضون في الأفق
+                  Positioned(
+                    top: 100,
+                    right: 60,
+                    child: Column(
+                      children: const [
+                        Text("🦹‍♂️", style: TextStyle(fontSize: 28)),
+                        Text("عدو", style: TextStyle(color: Colors.red, fontSize: 11)),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 20),
+          ),
 
-            // الأزرار التكتيكية للعبة
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1565C0), padding: const EdgeInsets.all(12)),
-              onPressed: _landPlane,
-              icon: const Icon(Icons.flight, color: Colors.white),
-              label: const Text('🪂 الهبوط بالمظلة في الخريطة', style: TextStyle(color: Colors.white, fontSize: 15)),
-            ),
-            const SizedBox(height: 10),
+          // لوحة التحكم والتحرك (أزرار الحركة يمين/يسار وإطلاق النار)
+          Container(
+            padding: const EdgeInsets.all(16),
+            color: const Color(0xFF1E293B),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                // زر التحرك لليسار
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.blueGrey, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12)),
+                  onPressed: () => movePlayer("left"),
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  label: const Text('يسار', style: TextStyle(color: Colors.white)),
+                ),
 
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2E7D32), padding: const EdgeInsets.all(12)),
-              onPressed: _lootWeapon,
-              icon: const Icon(Icons.security, color: Colors.white),
-              label: const Text('🎒 لوت الأسلحة والذخيرة', style: TextStyle(color: Colors.white, fontSize: 15)),
-            ),
-            const SizedBox(height: 10),
+                // زر إطلاق النار
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red[700], padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14)),
+                  onPressed: playerHealth > 0 ? fireWeapon : resetGame,
+                  icon: Icon(playerHealth > 0 ? Icons.local_fire_department : Icons.refresh, color: Colors.white),
+                  label: Text(playerHealth > 0 ? 'إطلاق نار 🎯' : 'إعادة الجيم 🔄', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
 
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF388E3C), padding: const EdgeInsets.all(12)),
-              onPressed: _lootArmor,
-              icon: const Icon(Icons.shield, color: Colors.white),
-              label: const Text('🛡️ لوت الدروع والخوذ', style: TextStyle(color: Colors.white, fontSize: 15)),
+                // زر التحرك لليمين
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.blueGrey, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12)),
+                  onPressed: () => movePlayer("right"),
+                  icon: const Icon(Icons.arrow_forward, color: Colors.white),
+                  label: const Text('يمين', style: TextStyle(color: Colors.white)),
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
-
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFC62828), padding: const EdgeInsets.all(12)),
-              onPressed: _fightEnemy,
-              icon: const Icon(Icons.flash_on, color: Colors.white),
-              label: const Text('⚔️ دخول منطقة الاشتباك وقتال الأعداء', style: TextStyle(color: Colors.white, fontSize: 15)),
-            ),
-            const SizedBox(height: 10),
-
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0288D1), padding: const EdgeInsets.all(12)),
-              onPressed: _useMedKit,
-              icon: const Icon(Icons.local_hospital, color: Colors.white),
-              label: const Text('💉 استخدام الإسعافات الأولية (MedKit)', style: TextStyle(color: Colors.white, fontSize: 15)),
-            ),
-            const SizedBox(height: 25),
-
-            // صندوق السجل والأحداث
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E1E1E),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                gameLog,
-                style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.4),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
