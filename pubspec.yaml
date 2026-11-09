@@ -1,5 +1,5 @@
-name: pubg_mobile
-description: A professional task manager built with Flutter.
+name: scarlet_game
+description: لعبة باتل رويال أوفلاين
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -9,7 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  shared_preferences: ^2.2.2
+  flame: ^1.18.0
 
 flutter:
   uses-material-design: true
