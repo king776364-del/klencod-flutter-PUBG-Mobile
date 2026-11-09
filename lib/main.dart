@@ -310,8 +310,8 @@ class BattleGame extends FlameGame with DragCallbacks, TapCallbacks {
     if (over) return;
     dt = min(dt, 0.05);
     time += dt;
-    flash = max(0, flash - dt);
-    if (time > 15) zoneR = max(220, zoneR - 16 * dt);
+    flash = max(0.0, flash - dt);
+    if (time > 15) zoneR = max(220.0, zoneR - 16 * dt);
 
     final mv = stickDir(moveId, moveC, moveP);
     final aim = stickDir(aimId, aimC, aimP);
@@ -329,7 +329,7 @@ class BattleGame extends FlameGame with DragCallbacks, TapCallbacks {
         if ((p.pos - player.pos).distance < 30) {
           if (p.type == 4) {
             if (player.hp >= 100) continue;
-            player.hp = min(100, player.hp + 40);
+            player.hp = min(100.0, player.hp + 40);
           } else {
             player.weapon = p.type;
             player.ammo[p.type] += weapons[p.type].mag * 3;
@@ -500,9 +500,126 @@ class BattleGame extends FlameGame with DragCallbacks, TapCallbacks {
 
     c.save();
     c.translate(-cam.dx, -cam.dy);
-    c.drawRect(const Rect.fromLTWH(0, 0, W, W),
+    c.drawRect(Rect.fromLTWH(0, 0, W, W),
         Paint()..color = const Color(0xFF4C8C3F));
     final lp = Paint()
       ..color = const Color(0x14000000)
       ..strokeWidth = 2;
-    for (double x
+    for (double x = (cam.dx / 150).floor() * 150.0;
+        x < cam.dx + sw + 150;
+        x += 150) {
+      c.drawLine(Offset(x, cam.dy), Offset(x, cam.dy + sh), lp);
+    }
+    for (double y = (cam.dy / 150).floor() * 150.0;
+        y < cam.dy + sh + 150;
+        y += 150) {
+      c.drawLine(Offset(cam.dx, y), Offset(cam.dx + sw, y), lp);
+    }
+
+    for (final b in buildings) {
+      if (view.overlaps(b)) {
+        c.drawRect(b, Paint()..color = const Color(0xFFCDB68A));
+      }
+    }
+    for (final wl in walls) {
+      if (view.overlaps(wl)) {
+        c.drawRect(wl, Paint()..color = const Color(0xFF5A4636));
+      }
+    }
+    final pickCols = <Color>[
+      Colors.white,
+      Colors.orange,
+      Colors.purple,
+      Colors.cyan,
+      Colors.greenAccent
+    ];
+    for (final p in pickups) {
+      if (!view.contains(p.pos)) continue;
+      c.drawCircle(p.pos, 13, Paint()..color = pickCols[p.type]);
+      c.drawCircle(
+          p.pos,
+          13,
+          Paint()
+            ..color = Colors.black87
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2);
+      drawTxt(c, p.type == 4 ? '+' : weapons[p.type].name,
+          p.pos + const Offset(0, -26),
+          fs: 12, center: true);
+    }
+    for (final car in cars) {
+      if (!view.contains(car.pos)) continue;
+      final isMine = identical(car, driving);
+      c.save();
+      c.translate(car.pos.dx, car.pos.dy);
+      c.rotate(car.angle);
+      c.drawRRect(
+          RRect.fromRectAndRadius(
+              Rect.fromCenter(center: Offset.zero, width: 64, height: 34),
+              const Radius.circular(8)),
+          Paint()..color = isMine ? Colors.amber : Colors.redAccent);
+      c.drawRect(Rect.fromLTWH(6, -13, 14, 26),
+          Paint()..color = const Color(0xFF223355));
+      c.restore();
+    }
+    for (final b in bots) {
+      if (!view.contains(b.pos)) continue;
+      drawUnit(c, b, Colors.redAccent);
+      c.drawRect(Rect.fromLTWH(b.pos.dx - 18, b.pos.dy - 28, 36, 5),
+          Paint()..color = Colors.black54);
+      c.drawRect(
+          Rect.fromLTWH(b.pos.dx - 18, b.pos.dy - 28, 36 * b.hp / 100, 5),
+          Paint()..color = Colors.greenAccent);
+    }
+    if (driving == null) drawUnit(c, player, Colors.lightBlueAccent);
+    for (final b in bullets) {
+      c.drawLine(
+          b.pos,
+          b.pos - b.vel * 0.02,
+          Paint()
+            ..color = b.mine ? Colors.yellow : Colors.orangeAccent
+            ..strokeWidth = 3);
+    }
+    for (final t in trees) {
+      if (!view.contains(t)) continue;
+      c.drawCircle(t, 38, Paint()..color = const Color(0xFF1F5E27));
+      c.drawCircle(t, 26, Paint()..color = const Color(0xFF2E7D32));
+      c.drawCircle(t, 14, Paint()..color = const Color(0xFF5D4037));
+    }
+    final zone = Path();
+    zone.fillType = PathFillType.evenOdd;
+    zone.addRect(Rect.fromLTWH(-2000, -2000, W + 4000, W + 4000));
+    zone.addOval(Rect.fromCircle(center: zoneC, radius: zoneR));
+    c.drawPath(zone, Paint()..color = const Color(0x55FF1744));
+    c.drawCircle(
+        zoneC,
+        zoneR,
+        Paint()
+          ..color = Colors.white
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 4);
+    c.restore();
+
+    if (flash > 0) {
+      c.drawRect(Rect.fromLTWH(0, 0, sw, sh),
+          Paint()..color = Color.fromRGBO(255, 0, 0, min(0.4, flash * 1.5)));
+    }
+
+    // الواجهة
+    drawStick(c, moveId, moveC, moveP, Offset(110, sh - 110));
+    drawStick(c, aimId, aimC, aimP, Offset(sw - 110, sh - 110));
+
+    c.drawRect(Rect.fromLTWH(12, 12, 160, 16), Paint()..color = Colors.black54);
+    c.drawRect(
+        Rect.fromLTWH(12, 12, 160 * max(0.0, player.hp) / 100, 16),
+        Paint()
+          ..color = player.hp > 30 ? Colors.greenAccent : Colors.redAccent);
+    if (driving != null) {
+      drawTxt(c, 'السيارة: ${max(0.0, driving!.hp).round()}',
+          const Offset(12, 34),
+          fs: 13);
+    }
+    drawTxt(c, 'الأحياء: ${bots.length + 1}   القتلى: $kills',
+        Offset(sw / 2, 20),
+        fs: 15, center: true);
+    if (time < 15) {
